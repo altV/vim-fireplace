@@ -192,10 +192,21 @@ function! s:extract_last_stacktrace(nrepl, session) abort
       return map(stacktrace, 'v:val.class.".".v:val.method."(".v:val.file.":".v:val.line.")"')
     endif
   endif
-  let format_st = '(symbol (str "\n\b" (apply str (interleave (repeat "\n") (map str (.getStackTrace *e)))) "\n\b\n"))'
+  if get(a:nrepl, 'is_piggieback', 0) && expand('%:e') =~? 'clj[sc]'
+    " if .-stack is present, it's already a \n-delimited string, and
+    "  .getStackTrace will NOT be present (figwheel is like this)
+    " if not present, however (ex: rhino repl), the `StackTraceElement`s 
+    " returned by .getStackTrace don't play well with clojurescript, so 
+    " we have to use amap to safely convert them to strings
+    let format_st = '(let [s (.-stack *e) s (if s s (let [st (.getStackTrace *e)] (clojure.string/join "\n" (amap st idx ret (str (aget st idx))))))] (symbol (str "\n\b\n" s "\n\b\n")))'
+  else
+    let format_st = '(symbol (str "\n\b" (apply str (interleave (repeat "\n") (map str (.getStackTrace *e)))) "\n\b\n"))'
+  endif
   let response = a:nrepl.process({'op': 'eval', 'code': '['.format_st.' *3 *2 *1]', 'ns': 'user', 'session': a:session})
   try
     let stacktrace = split(get(split(response.value[0], "\n\b\n"), 1, ""), "\n")
+    let g:resp = response
+    let g:last_stack = stacktrace
   catch
     throw string(response)
   endtry

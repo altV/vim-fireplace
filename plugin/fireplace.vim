@@ -292,6 +292,7 @@ function! s:repl.piggieback(arg, ...) abort
   let response = connection.eval('(cemerick.piggieback/cljs-repl'.' '.arg.')')
 
   if empty(get(response, 'ex'))
+    let connection.is_piggieback = 1
     call insert(self.piggiebacks, extend({'connection': connection}, deepcopy(s:piggieback)))
     return {}
   endif
